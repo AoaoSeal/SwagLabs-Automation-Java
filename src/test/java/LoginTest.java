@@ -11,6 +11,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.chrome.ChromeOptions;
 
 
 public class LoginTest {
@@ -19,26 +20,70 @@ public class LoginTest {
     JavascriptExecutor js;
     @Before
     public void setUp() {
-        driver = new ChromeDriver();
-        js = (JavascriptExecutor) driver;
-        vars = new HashMap<String, Object>();
+
+        // --- 步驟 1: 準備設定 (Options) ---
+        ChromeOptions options = new ChromeOptions();
+
+        // 加入這一行，開啟無痕模式
+        options.addArguments("--incognito");
+
+        // 建立一個 Map 來存放我們要關掉的功能
+        Map<String, Object> prefs = new HashMap<String, Object>();
+
+        // 這兩行就是用來「封口」Chrome，叫它不要跳出密碼外洩警告
+        prefs.put("credentials_enable_service", false);
+        prefs.put("profile.password_manager_enabled", false);
+
+        // 把這些設定塞進 options 裡
+        options.setExperimentalOption("prefs", prefs);
+
+        // --- 步驟 2: 帶著設定打開瀏覽器 ---
+        // 注意！這裡括號裡放入了 options，這是跟原本最不一樣的地方
+        driver = new ChromeDriver(options);
+        driver.manage().window().maximize(); // 優化視窗大小
     }
+
+    // 每次測試結束後，關閉瀏覽器
     @After
     public void tearDown() {
         driver.quit();
     }
+
+
+    // 測試案例 1: 標準使用者登入 (成功)
     @Test
-    public void login() {
+    public void login() throws InterruptedException {
         driver.get("https://www.saucedemo.com/");
-        driver.manage().window().setSize(new Dimension(1027, 833));
-        driver.findElement(By.cssSelector("*[data-test=\"login-credentials\"]")).click();
-        driver.findElement(By.cssSelector("*[data-test=\"login-credentials\"]")).click();
-        driver.findElement(By.cssSelector("*[data-test=\"username\"]")).click();
+
+
         driver.findElement(By.cssSelector("*[data-test=\"username\"]")).sendKeys("standard_user");
-        driver.findElement(By.cssSelector("*[data-test=\"login-password\"]")).click();
-        driver.findElement(By.cssSelector("*[data-test=\"password\"]")).click();
         driver.findElement(By.cssSelector("*[data-test=\"password\"]")).sendKeys("secret_sauce");
         driver.findElement(By.cssSelector("*[data-test=\"login-button\"]")).click();
+
+        // ✅因為登入成功，我們要驗證「網址」
         assertEquals("https://www.saucedemo.com/inventory.html", driver.getCurrentUrl());
+
+        // 讓程式暫停 3000 毫秒 (即 3 秒)，給你看一眼結果
+        Thread.sleep(3000);
+
+    }
+    // 測試案例 2: 鎖定使用者登入 (失敗)
+    @Test
+    public void loginLockedOutUser() throws InterruptedException {
+        driver.get("https://www.saucedemo.com/");
+
+
+        // 簡化：直接輸入，拿掉廢 click
+        driver.findElement(By.id("user-name")).sendKeys("locked_out_user");
+        driver.findElement(By.id("password")).sendKeys("secret_sauce");
+        driver.findElement(By.id("login-button")).click();
+
+        //  改用 assertTrue 來驗證「錯誤訊息」
+        String errorText = driver.findElement(By.cssSelector("h3[data-test='error']")).getText();
+        assertTrue(errorText.contains("locked out"));
+
+        // 讓程式暫停 3000 毫秒 (即 3 秒)，給你看一眼結果
+        Thread.sleep(3000);
+
     }
 }
